@@ -32,7 +32,7 @@ public class ApiClient : MonoBehaviour
 
     void OnClickPost()
     {
-
+        StartCoroutine(PostItem());
     }
 
     public IEnumerator GetItems()
@@ -43,7 +43,7 @@ public class ApiClient : MonoBehaviour
 
             if (request.result != UnityWebRequest.Result.Success)
             {
-                string msg = $"Get 失敗 : {request.error}";
+                string msg = $"Get Faild : {request.error}";
                 Debug.LogError(msg);
                 SetResultText(msg);
                 yield break;
@@ -51,36 +51,125 @@ public class ApiClient : MonoBehaviour
 
             string json = request.downloadHandler.text;
 
-            string wrapped = "{\"items\":" + json + "}";
-            wrapped = string.Format("{{\"items\":{0}}}", json);
+            string wrapped = string.Format("{{\"items\":{0}}}", json);
 
             ItemList list = JsonUtility.FromJson<ItemList>(wrapped);
 
-            builder.Clear();
-            builder.AppendLine("[Get] 一覧");
-            builder.AppendLine();
-
-            if(list == null || list.items == null || list.items.Length <= 0)
+            if(TryMake_SB_FromItemList(list, "GET", ref builder))
             {
-                builder.AppendLine("(データ無し)");
-            }
-            else
-            {
-                foreach (var item in list.items)
-                {
-                    builder.AppendFormat("ID:{0}, Name:{1}", item.id, item.name);
-                    builder.AppendLine();
-                }
+                SetResultText(builder.ToString());
             }
         }
-        
+    }
+
+    public IEnumerator PostItem()
+    {
+        if (nameInput == null)
+        {
+            SetResultText("{Post} nameInput is Null.");
+            yield break;
+        }
+
+        string name = nameInput.text;
+
+        if (string.IsNullOrEmpty(name))
+        {
+            SetResultText("{Post} nameInput is Empty.");
+            yield break;
+        }
+
+        if(name ==" " || name =="  "    //半角
+            || name == "　" || name == "　　") //全角
+        {
+            SetResultText("[Post] nameInput.text is Space.");
+            yield break;
+        }
+
+        string bodyJson = JsonUtility.ToJson(new CreateItemRequest(name));
+        byte[] bodyRaw = Encoding.UTF8.GetBytes(bodyJson);
+
+        using (UnityWebRequest req = new UnityWebRequest(url + EndpointItems, UnityWebRequest.kHttpVerbPOST))
+        {
+            req.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            req.downloadHandler = new DownloadHandlerBuffer();
+            req.SetRequestHeader("Content-Type", "application/json");
+
+            yield return req.SendWebRequest();
+
+            if(req.result != UnityWebRequest.Result.Success)
+            {
+                string msg = $"Post Failed : {req.error}";
+                Debug.LogError(msg);
+                SetResultText(msg);
+                yield break;
+            }
+
+            string json = req.downloadHandler.text;
+            Item item = JsonUtility.FromJson<Item>(json);
+
+            builder.Clear();
+            builder.AppendLine("[Post] Lists");
+            builder.AppendLine();
+
+            if (TryGetItemData(item, builder))
+            {
+                SetResultText(builder.ToString());
+            }
+        }
+
+        if(nameInput != null)
+        {
+            nameInput.text = string.Empty;
+        }
+    }
+
+    private static bool TryMake_SB_FromItemList(ItemList list, string method, ref StringBuilder _builder)
+    {
+        if(_builder == null)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(method))
+        {
+            method = "Unknown";
+        }
+
+        _builder.Clear();
+        _builder.AppendFormat("[{0}] Lists", method);
+        _builder.AppendLine();
+        _builder.AppendLine();
+
+        if (list == null || list.items == null || list.items.Length <= 0)
+        {
+            _builder.AppendLine("(No Data)");
+        }
+        else
+        {
+            foreach (var item in list.items)
+            {
+                TryGetItemData(item, _builder);
+            }
+        }
+        return true;
+    }
+
+    private static bool TryGetItemData(Item item, StringBuilder _builder)
+    {
+        if(item == null || _builder == null)
+        {
+            return false;
+        }
+        _builder.AppendFormat("ID:{0}, Name:{1}", item.id, item.name);
+        _builder.AppendLine();
+        return true;
     }
 
     void SetResultText(string text)
     {
         if(resultText != null)
         {
-            resultText.text = text;
+            resultText.SetText(text);
         }
     }
 
@@ -100,11 +189,11 @@ public class ApiClient : MonoBehaviour
     {
         if (getButton != null)
         {
-            getButton.onClick.AddListener(OnClickGet);
+            getButton.onClick.RemoveAllListeners();
         }
         if (postButton != null)
         {
-            postButton.onClick.AddListener(OnClickPost);
+            postButton.onClick.RemoveAllListeners();
         }
     }
 }

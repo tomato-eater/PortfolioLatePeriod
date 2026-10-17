@@ -7,21 +7,17 @@ import (
 	"sync"
 )
 
-
-
 type Item struct {
-	ID	 int	 `json:"id"`
-	Name string	 `json:"name"`
+	ID   int    `json:"id"`
+	Name string `json:"name"`
 }
 
 // データ保管場所
-var(
-	mu sync.Mutex
-	items = []Item{}
+var (
+	mu     sync.Mutex
+	items  = []Item{}
 	nextID = 1
 )
-
-
 
 func main() {
 	http.HandleFunc("/items", itemsHandler)
@@ -34,16 +30,17 @@ func main() {
 	}
 
 }
+
 // itemsHandler handles requests to the /items endpoint.
 func itemsHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
-		case http.MethodGet:
-			handleGet(w, r)
-		case http.MethodPost:
-			handlePost(w, r)
+	case http.MethodGet:
+		handleGet(w, r)
+	case http.MethodPost:
+		handlePost(w, r)
 
-		default:	// Handle unsupported methods
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	default: // Handle unsupported methods
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -53,19 +50,18 @@ func handleGet(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(items); err != nil {
-		http.Error(w, "Failed to encode items: " + err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to encode items: "+err.Error(), http.StatusInternalServerError)
 	}
 
 }
 
-
 func handlePost(w http.ResponseWriter, r *http.Request) {
 	var in Item
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		http.Error(w, "json decode error: " + err.Error(), http.StatusBadRequest)
+		http.Error(w, "json decode error: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	
+
 	if in.Name == "" {
 		http.Error(w, "name is required", http.StatusBadRequest)
 		return
@@ -76,17 +72,17 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mu.Lock()
-	
+
 	in.ID = nextID
 	nextID++
 	items = append(items, in)
 
 	mu.Unlock()
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated) //201 Created
 	if err := json.NewEncoder(w).Encode(in); err != nil {
-		http.Error(w, "Failed to encode item: " + err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to encode item: "+err.Error(), http.StatusInternalServerError)
 		return
-	}	
+	}
 }
